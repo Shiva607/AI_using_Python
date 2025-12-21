@@ -2,6 +2,8 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import os
 
+#  How to Make Your First Free LLM API Call Using OpenRouter.ai: https://medium.com/@sathishkumar.babu89/how-to-make-your-first-free-llm-api-call-using-openrouter-ai-181e7e5f72a5
+
 load_dotenv()
 
 client = OpenAI(
