@@ -3,6 +3,7 @@ import pandas as pd
 
 #! video Reference: https://www.youtube.com/watch?v=vtgDGrUiUKk
 #! Documentation: https://medium.com/@sathishkumar.babu89/pandas-series-the-one-dimensional-workhorse-youll-use-every-day-4628e8a1f6e2
+#! Notes: https://colab.research.google.com/drive/1vsANmljtPHhElyS9gOHo1cTsmBkpa9LE?usp=sharing
 
 def financial_returns_and_moving_averages():
     print("\n=== Financial Returns & Moving Averages ===")
