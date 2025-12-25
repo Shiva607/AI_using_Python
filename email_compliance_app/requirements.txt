@@ -1,0 +1,6 @@
+pip install streamlit
+pip install pandas
+pip install pydantic
+pip install openpyxl
+pip install regex
+pip install openai

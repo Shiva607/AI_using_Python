@@ -1,0 +1,15 @@
+from pydantic import BaseModel
+from typing import Literal
+
+class LLMResult(BaseModel):
+    final_category: Literal[
+        "Secrecy",
+        "Market Manipulation",
+        "Market Bribery",
+        "Change in Communication",
+        "Complaints",
+        "Employee Ethics",
+        "Secrecy + Market Manipulation",
+        "Market Bribery + Employee Ethics"
+    ]
+    final_priority: Literal["Critical", "High", "Medium", "Low"]
