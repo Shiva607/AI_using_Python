@@ -101,11 +101,15 @@ st.markdown("""
     .low-badge      { background-color: #DCFCE7; color: #166534; }
     
     .badge {
-        padding: 0.6rem 1.4rem;
-        border-radius: 30px;
-        font-weight: bold;
-        font-size: 1.1rem;
-    }
+    padding: 0.4rem 1rem;      /* Reduced vertical padding */
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 0.95rem;
+    display: inline-flex;
+    align-items: center;
+    height: 32px;              /* Fixed height for perfect alignment */
+    line-height: 1;
+}
     </style>
 """, unsafe_allow_html=True)
 
@@ -131,9 +135,8 @@ def get_priority_badge(priority):
 st.markdown('<h1 class="main-header">📧 Email Compliance Analysis Dashboard</h1>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">Hybrid Rule-based + LLM-powered detection of compliance risks and behavioral red flags in corporate emails</p>', unsafe_allow_html=True)
 
-
 # --------------------------------------------------
-# SIDEBAR - FILTERS ALWAYS VISIBLE
+# SIDEBAR - FILTERS ALWAYS VISIBLE & STABLE
 # --------------------------------------------------
 with st.sidebar:
     st.header("🔍 Filters")
@@ -145,23 +148,25 @@ with st.sidebar:
     ]
     PRIORITY_OPTIONS = ["Critical", "High", "Medium", "Low"]
 
-    # Persistent filters using session_state
+    # Persistent filters with UNIQUE KEYS (this fixes the disappearing issue)
     category_filter = st.multiselect(
         "Risk Category",
         CATEGORY_OPTIONS,
-        default=st.session_state.get("category_filter", [])
+        default=st.session_state.get("category_filter", []),
+        key="category_multiselect"  # ← UNIQUE KEY
     )
     priority_filter = st.multiselect(
         "Priority Level",
         PRIORITY_OPTIONS,
-        default=st.session_state.get("priority_filter", [])
+        default=st.session_state.get("priority_filter", []),
+        key="priority_multiselect"  # ← UNIQUE KEY
     )
 
-    # Save selections
+    # Save selections to session_state
     st.session_state.category_filter = category_filter
     st.session_state.priority_filter = priority_filter
 
-    st.markdown("---")
+    add_vertical_space(2)
 
     if st.button("🗑️ Start Over", use_container_width=True, type="secondary"):
         st.session_state.clear()
