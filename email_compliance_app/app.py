@@ -319,7 +319,7 @@ add_vertical_space(4)
 
 
 # --------------------------------------------------
-# CHARTS
+# CHARTS - LARGER & TALLER GRAPHS
 # --------------------------------------------------
 st.markdown('<h2 class="section-header">📊 Risk Distribution</h2>', unsafe_allow_html=True)
 
@@ -330,18 +330,42 @@ col1, col2 = st.columns(2)
 
 with col1:
     cat_data = display_df["category"].value_counts().reset_index()
-    fig_cat = px.bar(cat_data, x="category", y="count", title="Category Distribution", text="count", color_discrete_sequence=["#60A5FA"])
+    fig_cat = px.bar(
+        cat_data, 
+        x="category", 
+        y="count", 
+        title="Category Distribution", 
+        text="count", 
+        color_discrete_sequence=["#60A5FA"]
+    )
     fig_cat.update_traces(textposition="outside")
-    fig_cat.update_layout(xaxis_tickangle=45, showlegend=False)
-    st.plotly_chart(fig_cat, use_container_width=True)
+    fig_cat.update_layout(
+        xaxis_tickangle=45, 
+        showlegend=False,
+        height=600,          # ← Increases internal chart height
+        margin=dict(t=80, b=80)  # Optional: more space for title/labels
+    )
+    st.plotly_chart(fig_cat, use_container_width=True, height=600)  # ← Controls displayed height
 
 with col2:
     pri_data = display_df["priority"].value_counts().reset_index()
     colors = {"Critical": "#EF4444", "High": "#F59E0B", "Medium": "#EAB308", "Low": "#22C55E"}
-    fig_pri = px.bar(pri_data, x="priority", y="count", title="Priority Distribution", text="count", color="priority", color_discrete_map=colors)
+    fig_pri = px.bar(
+        pri_data, 
+        x="priority", 
+        y="count", 
+        title="Priority Distribution", 
+        text="count", 
+        color="priority", 
+        color_discrete_map=colors
+    )
     fig_pri.update_traces(textposition="outside")
-    fig_pri.update_layout(showlegend=False)
-    st.plotly_chart(fig_pri, use_container_width=True)
+    fig_pri.update_layout(
+        showlegend=False,
+        height=600,          # ← Increases internal chart height
+        margin=dict(t=80, b=60)
+    )
+    st.plotly_chart(fig_pri, use_container_width=True, height=600)  # ← Controls displayed height
 
 add_vertical_space(4)
 
