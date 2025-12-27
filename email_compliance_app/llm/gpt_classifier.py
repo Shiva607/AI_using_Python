@@ -23,7 +23,7 @@ WEIGHTS = {
     "language_risk": 0.10
 }
 
-# Category → Severity (0–5 scale)
+# Category → Severity (0–5 scale) - cleaned, no duplicates
 CATEGORY_SEVERITY = {
     "Secrecy": 5,
     "Market Manipulation": 4,
@@ -50,10 +50,9 @@ def score_to_priority(score: float) -> str:
 
 def calculate_weighted_score(category_score: float, confidence: float, language_risk: float) -> float:
     """
-    Formula:
-    Score = 100 × (w_cat × norm_cat + w_conf × confidence + w_lang × language_risk)
+    Final Score = 100 × (w_cat × normalized_category + w_conf × confidence + w_lang × language_risk)
     """
-    norm_category = category_score / 5.0  # Normalize 0–5 → 0–1
+    norm_category = category_score / 5.0  # Normalize from 0–5 to 0–1
     weighted = (
         WEIGHTS["category"] * norm_category +
         WEIGHTS["confidence"] * confidence +
@@ -61,10 +60,11 @@ def calculate_weighted_score(category_score: float, confidence: float, language_
     )
     return round(100 * weighted, 2)
 
+
 def classify_with_gpt(cleaned_text: str, rule_category: str, rule_priority: str):
     """
-    Calls LLM with detailed instructions for formula-based scoring.
-    Returns LLMResult with final_category and final_priority.
+    Uses LLM to detect categories, confidence, and language risk.
+    Applies weighted scoring formula and returns final category, priority, and score.
     """
     try:
         prompt = f"""
@@ -78,30 +78,28 @@ Category: {rule_category}
 Priority: {rule_priority}
 
 INSTRUCTIONS:
-1. Identify the main compliance risk categories present (use exact names from this list only):
+1. Identify compliance risk categories present. Use ONLY these exact names:
    {', '.join(CATEGORY_SEVERITY.keys())}
 
-2. For each detected category, assign its predefined severity:
+2. Predefined severity for each:
    {json.dumps(CATEGORY_SEVERITY, indent=2)}
 
-3. If multiple categories, average their severity scores.
+3. If multiple categories detected, average their severity scores.
 
 4. Estimate:
-   - model_confidence: How confident are you in your category assessment? (0.0 to 1.0)
-   - language_risk: How aggressive, evasive, or inappropriate is the language? (0.0 = neutral, 1.0 = highly risky)
+   - model_confidence: Your confidence in category detection (0.0 to 1.0)
+   - language_risk: How risky/evasive/inappropriate the language is (0.0 = neutral, 1.0 = highly risky)
 
-5. Return JSON in this exact format:
+5. Return JSON exactly like this:
 {{
-  "detected_categories": ["Category1", "Category2"],  // empty list if none
-  "average_severity": 3.5,                            // float, average of severity values
-  "model_confidence": 0.85,                           // 0.0–1.0
-  "language_risk": 0.40                               // 0.0–1.0
+  "detected_categories": ["Category1", "Category2"],
+  "average_severity": 3.5,
+  "model_confidence": 0.85,
+  "language_risk": 0.40
 }}
 
 EXAMPLE:
-Input email talks about insider tip + mild complaint tone.
-
-Response:
+Email about insider tip + complaint tone → 
 {{
   "detected_categories": ["Secrecy", "Complaints"],
   "average_severity": 3.5,
@@ -109,7 +107,7 @@ Response:
   "language_risk": 0.25
 }}
 
-Return ONLY the JSON. No explanation.
+Return ONLY JSON. No explanation.
 """
 
         response = client.chat.completions.create(
@@ -122,29 +120,31 @@ Return ONLY the JSON. No explanation.
         raw = response.choices[0].message.content.strip()
         result = json.loads(raw)
 
-        # Extract values
         categories = result.get("detected_categories", [])
         avg_severity = float(result.get("average_severity", 0))
         confidence = float(result.get("model_confidence", 0.5))
         lang_risk = float(result.get("language_risk", 0.0))
 
-        # Final category: use LLM's top one, or fallback to rule
+        # Final category: top detected or fallback
         final_cat = categories[0] if categories else rule_category
         final_cat = normalize_category(final_cat)
 
-        # Calculate score
+        # Calculate final score
         score = calculate_weighted_score(avg_severity, confidence, lang_risk)
         final_pri = score_to_priority(score)
 
+        # RETURN SCORE TOO — so you can show it in UI
         return LLMResult(
             final_category=final_cat,
-            final_priority=normalize_priority(final_pri)
+            final_priority=normalize_priority(final_pri),
+            score=score  # ← Now returning the calculated score
         )
 
     except Exception as e:
-        # SAFE FALLBACK — Use rule-based only
         print(f"LLM classification failed: {e}. Using rule-based fallback.")
+        # Safe fallback
         return LLMResult(
             final_category=normalize_category(rule_category),
-            final_priority=normalize_priority(rule_priority)
+            final_priority=normalize_priority(rule_priority),
+            score=0.0  # No score on fallback
         )

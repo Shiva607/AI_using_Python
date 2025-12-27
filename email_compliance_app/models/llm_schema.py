@@ -13,3 +13,4 @@ class LLMResult(BaseModel):
         "Market Bribery + Employee Ethics"
     ]
     final_priority: Literal["Critical", "High", "Medium", "Low"]
+    score: float = 0.0  # ← New field: the calculated risk score (0–100)
