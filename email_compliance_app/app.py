@@ -101,15 +101,15 @@ st.markdown("""
     .low-badge      { background-color: #DCFCE7; color: #166534; }
     
     .badge {
-    padding: 0.4rem 1rem;      /* Reduced vertical padding */
-    border-radius: 20px;
-    font-weight: bold;
-    font-size: 0.95rem;
-    display: inline-flex;
-    align-items: center;
-    height: 32px;              /* Fixed height for perfect alignment */
-    line-height: 1;
-}
+        padding: 0.4rem 1rem;
+        border-radius: 20px;
+        font-weight: bold;
+        font-size: 0.95rem;
+        display: inline-flex;
+        align-items: center;
+        height: 32px;
+        line-height: 1;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -168,7 +168,7 @@ with st.sidebar:
 
     add_vertical_space(2)
 
-    if st.button("🗑️ Start Over", use_container_width=True, type="secondary"):
+    if st.button("🗑️ Start Over", width="stretch", type="secondary"):
         st.session_state.clear()
         st.rerun()
     st.caption("Clears all current results, filters, and lets you upload a new dataset")
@@ -224,15 +224,22 @@ if "processed_df" not in st.session_state:
             rule_cat = detect_category(cleaned)
             rule_pri = detect_priority(rule_cat)
 
+            # Default: assume success
+            llm_success = True
+            final_score = 0.0
+
             try:
                 llm_result = classify_with_gpt(cleaned, rule_cat, rule_pri)
                 final_cat = llm_result.final_category
                 final_pri = llm_result.final_priority
                 final_score = llm_result.score
-            except Exception:
+                llm_success = llm_result.llm_success
+            except Exception as e:
+                print(f"LLM failed for email {i+1}: {e}")
                 final_cat = rule_cat
                 final_pri = rule_pri
                 final_score = 0.0
+                llm_success = False
 
             record = EmailOutput(
                 unique_id=int(row.get("Unique ID", 0)),
@@ -244,7 +251,8 @@ if "processed_df" not in st.session_state:
                 priority=final_pri,
                 junk_removed=junk,
                 cleaned_text=cleaned,
-                score=final_score
+                score=final_score,
+                llm_success=llm_success
             )
             results.append(record.dict())
             progress_bar.progress((i + 1) / len(df))
@@ -349,11 +357,9 @@ with col1:
     fig_cat.update_traces(textposition="outside")
     fig_cat.update_layout(
         xaxis_tickangle=45, 
-        showlegend=False,
-        height=600,          # ← Increases internal chart height
-        margin=dict(t=80, b=80)  # Optional: more space for title/labels
+        showlegend=False, height=600
     )
-    st.plotly_chart(fig_cat, use_container_width=True, height=600)  # ← Controls displayed height
+    st.plotly_chart(fig_cat, width="stretch", height=600)
 
 with col2:
     pri_data = display_df["priority"].value_counts().reset_index()
@@ -370,10 +376,9 @@ with col2:
     fig_pri.update_traces(textposition="outside")
     fig_pri.update_layout(
         showlegend=False,
-        height=600,          # ← Increases internal chart height
-        margin=dict(t=80, b=60)
+        height=600
     )
-    st.plotly_chart(fig_pri, use_container_width=True, height=600)  # ← Controls displayed height
+    st.plotly_chart(fig_pri, width="stretch", height=600)
 
 add_vertical_space(4)
 
@@ -400,10 +405,6 @@ else:
         subject = safe_str(row['subject']) or "No Subject"
         badge = get_priority_badge(row['priority'])
         
-        # BAD — HTML in title (gets escaped)
-        # with st.expander(f"📧 **{subject}** &nbsp;&nbsp; {badge} &nbsp;&nbsp; `{row['category']}`"):
-
-        # GOOD — Plain text + emoji in title
         priority_emoji = {
             "Critical": "🔴",
             "High": "🟠",
@@ -423,37 +424,39 @@ else:
             
             with c2:
                 st.subheader("🛡️ Compliance Analysis")
+                
+                source_text = "AI (LLM)" if row.get('llm_success', True) else "Rule-based fallback"
+                st.markdown(f"**Source:** {source_text}")
+                
+                if row.get('llm_success', True):
+                    st.success("✅ AI analysis successful")
+                else:
+                    st.error("❌ AI analysis failed — using rule-based fallback")
+                    st.caption("Possible causes: Invalid API key, network issue, rate limit, or model error")
+                
                 st.markdown(f"**Risk Category:** `{row['category']}`")
                 st.markdown(f"**Priority Level:** {badge}", unsafe_allow_html=True)
 
-                # NEW: Show Scoring Breakdown
                 st.markdown("### 📊 Scoring Breakdown")
-                
-                # You'll need to store the score in your record — see note below
-                score = row.get("score", "N/A")  # if you add score to record
-                
-                if score != "N/A":
-                    st.markdown(f"**Final Risk Score:** `{score}/100`")
-                    
-                    # Optional: Show components
-                    col_a, col_b, col_c = st.columns(3)
-                    with col_a:
-                        st.metric("Category Weight", "60%")
-                    with col_b:
-                        st.metric("Confidence Weight", "30%")
-                    with col_c:
-                        st.metric("Language Risk Weight", "10%")
-                    
-                    st.caption(f"Score calculated as: 100 × (0.60 × normalized_category + 0.30 × confidence + 0.10 × language_risk)")
-                else:
-                    st.caption("Score calculated internally using weighted formula")
+                score = row.get("score", 0.0)
+                st.markdown(f"**Final Risk Score:** `{score}/100`")
+
+                col_a, col_b, col_c = st.columns(3)
+                with col_a:
+                    st.metric("Category Weight", "60%")
+                with col_b:
+                    st.metric("Confidence Weight", "30%")
+                with col_c:
+                    st.metric("Language Risk Weight", "10%")
+
+                st.caption("Score = 100 × (0.60 × norm_category + 0.30 × confidence + 0.10 × language_risk)")
 
                 st.text_area("Cleaned Text", row["cleaned_text"], height=300, disabled=True, label_visibility="collapsed")
 
 add_vertical_space(4)
 
 # --------------------------------------------------
-# TABLE & DOWNLOAD - EXACT FORMAT YOU WANT
+# TABLE & DOWNLOAD - EXACT FORMAT
 # --------------------------------------------------
 st.markdown('<h2 class="section-header">📋 Full Results Table</h2>', unsafe_allow_html=True)
 
@@ -490,8 +493,7 @@ display_table = display_table.rename(columns={
 # Format score as integer (e.g., 77 instead of 77.0)
 display_table["Risk Score /100"] = display_table["Risk Score /100"].round(0).astype(int)
 
-# Show the table
-st.dataframe(display_table, use_container_width=True, height=600)
+st.dataframe(display_table, width="stretch", height=600)
 
 add_vertical_space(3)
 
@@ -512,7 +514,7 @@ st.download_button(
     data=buffer,
     file_name=f"email_compliance_report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    use_container_width=True
+    width="stretch"
 )
 
 st.caption("Report includes all columns: Unique ID, From, To, Subject, Original Body, Junk Removed, Cleaned Text, Category, Priority, and Risk Score")
