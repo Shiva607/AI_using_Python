@@ -18,6 +18,7 @@ class EmailOutput(BaseModel):
     category: str = Field(..., description="Final compliance risk category")
     priority: Literal["Critical", "High", "Medium", "Low"] = Field(..., description="Final risk priority level")
     score: float = Field(0.0, description="Weighted risk score (0-100) from formula")  # ← NEW: Risk Score
+    llm_success: bool = True
 
 
     class Config:

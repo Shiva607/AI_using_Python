@@ -14,3 +14,4 @@ class LLMResult(BaseModel):
     ]
     final_priority: Literal["Critical", "High", "Medium", "Low"]
     score: float = 0.0  # ← New field: the calculated risk score (0–100)
+    llm_success: bool = True
