@@ -138,6 +138,11 @@ No explanation. Only JSON.
             messages=[{"role": "user", "content": prompt}]
         )
 
+        usage = response.usage
+        prompt_tokens = usage.prompt_tokens if usage else 0
+        completion_tokens = usage.completion_tokens if usage else 0
+        total_tokens = usage.total_tokens if usage else 0
+
         # Safety checks
         if hasattr(response, 'error') and response.error:
             raise Exception(f"API Error: {response.error.message if hasattr(response.error, 'message') else str(response.error)}")
@@ -167,7 +172,10 @@ No explanation. Only JSON.
             final_category=final_cat,
             final_priority=normalize_priority(final_pri),
             score=score,
-            llm_success=True
+            llm_success=True,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens
         )
 
     except Exception as e:
@@ -176,5 +184,8 @@ No explanation. Only JSON.
             final_category=normalize_category(rule_category),
             final_priority=normalize_priority(rule_priority),
             score=0.0,
-            llm_success=False
+            llm_success=False,
+            prompt_tokens=0,
+            completion_tokens=0,
+            total_tokens=0
         )

@@ -148,21 +148,19 @@ with st.sidebar:
     ]
     PRIORITY_OPTIONS = ["Critical", "High", "Medium", "Low"]
 
-    # Persistent filters with UNIQUE KEYS (this fixes the disappearing issue)
     category_filter = st.multiselect(
         "Risk Category",
         CATEGORY_OPTIONS,
         default=st.session_state.get("category_filter", []),
-        key="category_multiselect"  # ← UNIQUE KEY
+        key="category_multiselect"
     )
     priority_filter = st.multiselect(
         "Priority Level",
         PRIORITY_OPTIONS,
         default=st.session_state.get("priority_filter", []),
-        key="priority_multiselect"  # ← UNIQUE KEY
+        key="priority_multiselect"
     )
 
-    # Save selections to session_state
     st.session_state.category_filter = category_filter
     st.session_state.priority_filter = priority_filter
 
@@ -196,7 +194,6 @@ if not uploaded:
     st.info("⬆️ Please upload an Excel file to begin analysis")
     st.stop()
 
-# Reset if new file
 if "last_uploaded_filename" not in st.session_state or st.session_state.last_uploaded_filename != uploaded.name:
     st.session_state.last_uploaded_filename = uploaded.name
     st.session_state.pop("processed_df", None)
@@ -227,6 +224,9 @@ if "processed_df" not in st.session_state:
             # Default: assume success
             llm_success = True
             final_score = 0.0
+            prompt_tokens = 0
+            completion_tokens = 0
+            total_tokens = 0
 
             try:
                 llm_result = classify_with_gpt(cleaned, rule_cat, rule_pri)
@@ -234,12 +234,18 @@ if "processed_df" not in st.session_state:
                 final_pri = llm_result.final_priority
                 final_score = llm_result.score
                 llm_success = llm_result.llm_success
+                prompt_tokens = llm_result.prompt_tokens
+                completion_tokens = llm_result.completion_tokens
+                total_tokens = llm_result.total_tokens
             except Exception as e:
                 print(f"LLM failed for email {i+1}: {e}")
                 final_cat = rule_cat
                 final_pri = rule_pri
                 final_score = 0.0
                 llm_success = False
+                prompt_tokens = 0
+                completion_tokens = 0
+                total_tokens = 0
 
             record = EmailOutput(
                 unique_id=int(row.get("Unique ID", 0)),
@@ -252,7 +258,10 @@ if "processed_df" not in st.session_state:
                 junk_removed=junk,
                 cleaned_text=cleaned,
                 score=final_score,
-                llm_success=llm_success
+                llm_success=llm_success,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens
             )
             results.append(record.dict())
             progress_bar.progress((i + 1) / len(df))
@@ -335,7 +344,7 @@ add_vertical_space(4)
 
 
 # --------------------------------------------------
-# CHARTS - LARGER & TALLER GRAPHS
+# CHARTS
 # --------------------------------------------------
 st.markdown('<h2 class="section-header">📊 Risk Distribution</h2>', unsafe_allow_html=True)
 
@@ -346,38 +355,17 @@ col1, col2 = st.columns(2)
 
 with col1:
     cat_data = display_df["category"].value_counts().reset_index()
-    fig_cat = px.bar(
-        cat_data, 
-        x="category", 
-        y="count", 
-        title="Category Distribution", 
-        text="count", 
-        color_discrete_sequence=["#60A5FA"]
-    )
+    fig_cat = px.bar(cat_data, x="category", y="count", title="Category Distribution", text="count", color_discrete_sequence=["#60A5FA"])
     fig_cat.update_traces(textposition="outside")
-    fig_cat.update_layout(
-        xaxis_tickangle=45, 
-        showlegend=False, height=600
-    )
+    fig_cat.update_layout(xaxis_tickangle=45, showlegend=False, height=600)
     st.plotly_chart(fig_cat, width="stretch", height=600)
 
 with col2:
     pri_data = display_df["priority"].value_counts().reset_index()
     colors = {"Critical": "#EF4444", "High": "#F59E0B", "Medium": "#EAB308", "Low": "#22C55E"}
-    fig_pri = px.bar(
-        pri_data, 
-        x="priority", 
-        y="count", 
-        title="Priority Distribution", 
-        text="count", 
-        color="priority", 
-        color_discrete_map=colors
-    )
+    fig_pri = px.bar(pri_data, x="priority", y="count", title="Priority Distribution", text="count", color="priority", color_discrete_map=colors)
     fig_pri.update_traces(textposition="outside")
-    fig_pri.update_layout(
-        showlegend=False,
-        height=600
-    )
+    fig_pri.update_layout(showlegend=False, height=600)
     st.plotly_chart(fig_pri, width="stretch", height=600)
 
 add_vertical_space(4)
@@ -451,30 +439,35 @@ else:
 
                 st.caption("Score = 100 × (0.60 × norm_category + 0.30 × confidence + 0.10 × language_risk)")
 
+                # TOKEN USAGE DISPLAY
+                if row.get('llm_success', True) and row.get('total_tokens', 0) > 0:
+                    col_t1, col_t2, col_t3 = st.columns(3)
+                    with col_t1:
+                        st.metric("Prompt Tokens", row['prompt_tokens'])
+                    with col_t2:
+                        st.metric("Completion Tokens", row['completion_tokens'])
+                    with col_t3:
+                        st.metric("Total Tokens", row['total_tokens'])
+                    st.caption("Token usage for this email classification (cost monitoring)")
+                elif not row.get('llm_success', True):
+                    st.caption("Token usage not available — AI analysis failed")
+
                 st.text_area("Cleaned Text", row["cleaned_text"], height=300, disabled=True, label_visibility="collapsed")
 
 add_vertical_space(4)
+
 
 # --------------------------------------------------
 # TABLE & DOWNLOAD - EXACT FORMAT
 # --------------------------------------------------
 st.markdown('<h2 class="section-header">📋 Full Results Table</h2>', unsafe_allow_html=True)
 
-# Define exact column order and names
 column_order = [
-    "unique_id",
-    "from_email",
-    "to_email",
-    "subject",
-    "email_body",
-    "junk_removed",
-    "cleaned_text",
-    "category",
-    "priority",
-    "score"
+    "unique_id", "from_email", "to_email", "subject",
+    "email_body", "junk_removed", "cleaned_text",
+    "category", "priority", "score"
 ]
 
-# Create display table with exact column names
 display_table = display_df[column_order].copy()
 
 display_table = display_table.rename(columns={
@@ -490,23 +483,17 @@ display_table = display_table.rename(columns={
     "score": "Risk Score /100"
 })
 
-# Format score as integer (e.g., 77 instead of 77.0)
 display_table["Risk Score /100"] = display_table["Risk Score /100"].round(0).astype(int)
 
 st.dataframe(display_table, width="stretch", height=600)
 
 add_vertical_space(3)
 
-# --------------------------------------------------
-# DOWNLOAD - SAME FORMAT AS TABLE
-# --------------------------------------------------
 st.markdown('<h2 class="section-header">📥 Export Results</h2>', unsafe_allow_html=True)
 
 buffer = BytesIO()
 with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-    # Use the same formatted table for export
     display_table.to_excel(writer, index=False, sheet_name="Compliance Analysis")
-
 buffer.seek(0)
 
 st.download_button(

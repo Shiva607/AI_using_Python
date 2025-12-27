@@ -19,6 +19,9 @@ class EmailOutput(BaseModel):
     priority: Literal["Critical", "High", "Medium", "Low"] = Field(..., description="Final risk priority level")
     score: float = Field(0.0, description="Weighted risk score (0-100) from formula")  # ← NEW: Risk Score
     llm_success: bool = True
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
 
 
     class Config:
