@@ -121,10 +121,10 @@ def safe_str(value):
 
 def get_priority_badge(priority):
     badges = {
-        "Critical": '<span class="critical-badge badge">🔴 Critical</span>',
-        "High": '<span class="high-badge badge">🟠 High</span>',
-        "Medium": '<span class="medium-badge badge">🟡 Medium</span>',
-        "Low": '<span class="low-badge badge">🟢 Low</span>',
+        "Critical": '<span class="critical-badge badge">Critical</span>',
+        "High":     '<span class="high-badge badge">High</span>',
+        "Medium":   '<span class="medium-badge badge">Medium</span>',
+        "Low":      '<span class="low-badge badge">Low</span>',
     }
     return badges.get(priority, priority)
 
@@ -228,9 +228,11 @@ if "processed_df" not in st.session_state:
                 llm_result = classify_with_gpt(cleaned, rule_cat, rule_pri)
                 final_cat = llm_result.final_category
                 final_pri = llm_result.final_priority
+                final_score = llm_result.score
             except Exception:
                 final_cat = rule_cat
                 final_pri = rule_pri
+                final_score = 0.0
 
             record = EmailOutput(
                 unique_id=int(row.get("Unique ID", 0)),
@@ -242,6 +244,7 @@ if "processed_df" not in st.session_state:
                 priority=final_pri,
                 junk_removed=junk,
                 cleaned_text=cleaned,
+                score=final_score
             )
             results.append(record.dict())
             progress_bar.progress((i + 1) / len(df))
@@ -397,7 +400,18 @@ else:
         subject = safe_str(row['subject']) or "No Subject"
         badge = get_priority_badge(row['priority'])
         
-        with st.expander(f"📧 **{subject}** &nbsp;&nbsp; {badge} &nbsp;&nbsp; `{row['category']}`"):
+        # BAD — HTML in title (gets escaped)
+        # with st.expander(f"📧 **{subject}** &nbsp;&nbsp; {badge} &nbsp;&nbsp; `{row['category']}`"):
+
+        # GOOD — Plain text + emoji in title
+        priority_emoji = {
+            "Critical": "🔴",
+            "High": "🟠",
+            "Medium": "🟡",
+            "Low": "🟢"
+        }.get(row['priority'], "⚪")
+
+        with st.expander(f"📧 **{subject}** &nbsp;&nbsp; {priority_emoji} {row['priority']} &nbsp;&nbsp; `{row['category']}`"):
             c1, c2 = st.columns(2, gap="large")
             
             with c1:
@@ -411,24 +425,86 @@ else:
                 st.subheader("🛡️ Compliance Analysis")
                 st.markdown(f"**Risk Category:** `{row['category']}`")
                 st.markdown(f"**Priority Level:** {badge}", unsafe_allow_html=True)
+
+                # NEW: Show Scoring Breakdown
+                st.markdown("### 📊 Scoring Breakdown")
+                
+                # You'll need to store the score in your record — see note below
+                score = row.get("score", "N/A")  # if you add score to record
+                
+                if score != "N/A":
+                    st.markdown(f"**Final Risk Score:** `{score}/100`")
+                    
+                    # Optional: Show components
+                    col_a, col_b, col_c = st.columns(3)
+                    with col_a:
+                        st.metric("Category Weight", "60%")
+                    with col_b:
+                        st.metric("Confidence Weight", "30%")
+                    with col_c:
+                        st.metric("Language Risk Weight", "10%")
+                    
+                    st.caption(f"Score calculated as: 100 × (0.60 × normalized_category + 0.30 × confidence + 0.10 × language_risk)")
+                else:
+                    st.caption("Score calculated internally using weighted formula")
+
                 st.text_area("Cleaned Text", row["cleaned_text"], height=300, disabled=True, label_visibility="collapsed")
 
 add_vertical_space(4)
 
-
 # --------------------------------------------------
-# TABLE & DOWNLOAD
+# TABLE & DOWNLOAD - EXACT FORMAT YOU WANT
 # --------------------------------------------------
 st.markdown('<h2 class="section-header">📋 Full Results Table</h2>', unsafe_allow_html=True)
-st.dataframe(display_df, use_container_width=True, height=600)
+
+# Define exact column order and names
+column_order = [
+    "unique_id",
+    "from_email",
+    "to_email",
+    "subject",
+    "email_body",
+    "junk_removed",
+    "cleaned_text",
+    "category",
+    "priority",
+    "score"
+]
+
+# Create display table with exact column names
+display_table = display_df[column_order].copy()
+
+display_table = display_table.rename(columns={
+    "unique_id": "Unique ID",
+    "from_email": "From",
+    "to_email": "To",
+    "subject": "Subject",
+    "email_body": "Email Body (BEFORE Preprocessing - with Junk)",
+    "junk_removed": "What Gets Removed (Junk Preprocessing)",
+    "cleaned_text": "Cleaned Text (AFTER Preprocessing)",
+    "category": "Category",
+    "priority": "Priority",
+    "score": "Risk Score /100"
+})
+
+# Format score as integer (e.g., 77 instead of 77.0)
+display_table["Risk Score /100"] = display_table["Risk Score /100"].round(0).astype(int)
+
+# Show the table
+st.dataframe(display_table, use_container_width=True, height=600)
 
 add_vertical_space(3)
 
+# --------------------------------------------------
+# DOWNLOAD - SAME FORMAT AS TABLE
+# --------------------------------------------------
 st.markdown('<h2 class="section-header">📥 Export Results</h2>', unsafe_allow_html=True)
 
 buffer = BytesIO()
 with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-    display_df.to_excel(writer, index=False, sheet_name="Compliance Analysis")
+    # Use the same formatted table for export
+    display_table.to_excel(writer, index=False, sheet_name="Compliance Analysis")
+
 buffer.seek(0)
 
 st.download_button(
@@ -439,4 +515,4 @@ st.download_button(
     use_container_width=True
 )
 
-st.caption("Report includes all columns: ID, sender, recipient, subject, raw & cleaned body, category, priority, and removed junk.")
+st.caption("Report includes all columns: Unique ID, From, To, Subject, Original Body, Junk Removed, Cleaned Text, Category, Priority, and Risk Score")
