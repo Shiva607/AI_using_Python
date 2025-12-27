@@ -294,6 +294,75 @@ show_full_warning = df_filtered.empty and (category_filter or priority_filter)
 # --------------------------------------------------
 # EXECUTIVE SUMMARY
 # --------------------------------------------------
+# st.markdown('<h2 class="section-header">📌 Compliance Overview</h2>', unsafe_allow_html=True)
+
+# priority_counts = df_full["priority"].value_counts()
+
+# # Calculate total token usage
+# total_prompt = df_full["prompt_tokens"].sum()
+# total_completion = df_full["completion_tokens"].sum()
+# total_tokens_used = df_full["total_tokens"].sum()
+
+# col1, col2, col3, col4, col5, col6 = st.columns(6)  # Now 6 columns
+
+# with col1:
+#     st.markdown(f"""
+#         <div class="metric-card">
+#             <div class="metric-label">Total Emails</div>
+#             <div class="metric-value">{len(df_full)}</div>
+#         </div>
+#     """, unsafe_allow_html=True)
+
+# with col2:
+#     st.markdown(f"""
+#         <div class="metric-card">
+#             <div class="metric-label">Critical</div>
+#             <div class="metric-value">{priority_counts.get('Critical', 0)}</div>
+#         </div>
+#     """, unsafe_allow_html=True)
+
+# with col3:
+#     st.markdown(f"""
+#         <div class="metric-card">
+#             <div class="metric-label">High</div>
+#             <div class="metric-value">{priority_counts.get('High', 0)}</div>
+#         </div>
+#     """, unsafe_allow_html=True)
+
+# with col4:
+#     st.markdown(f"""
+#         <div class="metric-card">
+#             <div class="metric-label">Medium</div>
+#             <div class="metric-value">{priority_counts.get('Medium', 0)}</div>
+#         </div>
+#     """, unsafe_allow_html=True)
+
+# with col5:
+#     st.markdown(f"""
+#         <div class="metric-card">
+#             <div class="metric-label">Low</div>
+#             <div class="metric-value">{priority_counts.get('Low', 0)}</div>
+#         </div>
+#     """, unsafe_allow_html=True)
+
+# with col6:
+#     st.markdown(f"""
+#         <div class="metric-card">
+#             <div class="metric-label">Total Tokens Used</div>
+#             <div class="metric-value">{total_tokens_used:,}</div>
+#         </div>
+#     """, unsafe_allow_html=True)
+
+# add_vertical_space(2)
+
+# # Optional: Show breakdown
+# st.caption(f"Token breakdown: Prompt: {total_prompt:,} | Completion: {total_completion:,} | Total: {total_tokens_used:,}")
+
+# add_vertical_space(4)
+
+# --------------------------------------------------
+# EXECUTIVE SUMMARY - CLEAN 2-ROW LAYOUT
+# --------------------------------------------------
 st.markdown('<h2 class="section-header">📌 Compliance Overview</h2>', unsafe_allow_html=True)
 
 priority_counts = df_full["priority"].value_counts()
@@ -303,49 +372,18 @@ total_prompt = df_full["prompt_tokens"].sum()
 total_completion = df_full["completion_tokens"].sum()
 total_tokens_used = df_full["total_tokens"].sum()
 
-col1, col2, col3, col4, col5, col6 = st.columns(6)  # Now 6 columns
+# First row: Total Emails + Total Tokens
+col_total, col_tokens = st.columns(2)
 
-with col1:
+with col_total:
     st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">Total Emails</div>
+            <div class="metric-label">Total Emails Processed</div>
             <div class="metric-value">{len(df_full)}</div>
         </div>
     """, unsafe_allow_html=True)
 
-with col2:
-    st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Critical</div>
-            <div class="metric-value">{priority_counts.get('Critical', 0)}</div>
-        </div>
-    """, unsafe_allow_html=True)
-
-with col3:
-    st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">High</div>
-            <div class="metric-value">{priority_counts.get('High', 0)}</div>
-        </div>
-    """, unsafe_allow_html=True)
-
-with col4:
-    st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Medium</div>
-            <div class="metric-value">{priority_counts.get('Medium', 0)}</div>
-        </div>
-    """, unsafe_allow_html=True)
-
-with col5:
-    st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Low</div>
-            <div class="metric-value">{priority_counts.get('Low', 0)}</div>
-        </div>
-    """, unsafe_allow_html=True)
-
-with col6:
+with col_tokens:
     st.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">Total Tokens Used</div>
@@ -355,11 +393,47 @@ with col6:
 
 add_vertical_space(2)
 
-# Optional: Show breakdown
+# Second row: Priority breakdown
+col_crit, col_high, col_med, col_low = st.columns(4)
+
+with col_crit:
+    st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Critical</div>
+            <div class="metric-value">{priority_counts.get('Critical', 0)}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+with col_high:
+    st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">High</div>
+            <div class="metric-value">{priority_counts.get('High', 0)}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+with col_med:
+    st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Medium</div>
+            <div class="metric-value">{priority_counts.get('Medium', 0)}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+with col_low:
+    st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Low</div>
+            <div class="metric-value">{priority_counts.get('Low', 0)}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+add_vertical_space(2)
+
+# Optional caption with token breakdown
 st.caption(f"Token breakdown: Prompt: {total_prompt:,} | Completion: {total_completion:,} | Total: {total_tokens_used:,}")
 
 add_vertical_space(4)
-
 
 # --------------------------------------------------
 # CHARTS
