@@ -298,7 +298,12 @@ st.markdown('<h2 class="section-header">📌 Compliance Overview</h2>', unsafe_a
 
 priority_counts = df_full["priority"].value_counts()
 
-col1, col2, col3, col4, col5 = st.columns(5)
+# Calculate total token usage
+total_prompt = df_full["prompt_tokens"].sum()
+total_completion = df_full["completion_tokens"].sum()
+total_tokens_used = df_full["total_tokens"].sum()
+
+col1, col2, col3, col4, col5, col6 = st.columns(6)  # Now 6 columns
 
 with col1:
     st.markdown(f"""
@@ -339,6 +344,19 @@ with col5:
             <div class="metric-value">{priority_counts.get('Low', 0)}</div>
         </div>
     """, unsafe_allow_html=True)
+
+with col6:
+    st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Total Tokens Used</div>
+            <div class="metric-value">{total_tokens_used:,}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+add_vertical_space(2)
+
+# Optional: Show breakdown
+st.caption(f"Token breakdown: Prompt: {total_prompt:,} | Completion: {total_completion:,} | Total: {total_tokens_used:,}")
 
 add_vertical_space(4)
 
