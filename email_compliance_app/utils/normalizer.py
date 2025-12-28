@@ -1,3 +1,5 @@
+# email_compliance_app\utils\normalizer.py
+
 from typing import Set
 
 # --------------------------------------------------

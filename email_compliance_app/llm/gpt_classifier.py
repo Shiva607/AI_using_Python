@@ -1,4 +1,4 @@
-# llm/gpt_classifier.py
+# email_compliance_app\llm\gpt_classifier.py
 
 import json
 import os

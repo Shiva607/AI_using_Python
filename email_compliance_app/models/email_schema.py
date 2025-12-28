@@ -1,4 +1,4 @@
-# models/email_schema.py
+# email_compliance_app\models\email_schema.py
 
 from pydantic import BaseModel, Field
 from typing import Literal

@@ -1,3 +1,5 @@
+# email_compliance_app\preprocessing\rules.py
+
 def detect_category(text: str):
     t = text.lower()
 
