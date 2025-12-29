@@ -1,6 +1,9 @@
-pip install streamlit
-pip install pandas
-pip install pydantic
-pip install openpyxl
-pip install regex
-pip install openai
+streamlit
+pandas
+pydantic
+openpyxl
+regex
+openai
+plotly
+streamlit_extras
+dotenv
