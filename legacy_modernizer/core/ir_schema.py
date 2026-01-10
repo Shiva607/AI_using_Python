@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 class IOType(BaseModel):
     """Input/Output parameter type"""
     name: str = Field(..., description="Parameter name")
-    type: str = Field(..., description="Data type (e.g., int, String, List[str])")
+    type: str = Field(..., description="Data type")
     description: Optional[str] = Field(None, description="What this parameter represents")
 
 
@@ -23,12 +23,12 @@ class FunctionIR(BaseModel):
     description: str = Field(..., description="What this function does")
     inputs: List[IOType] = Field(default_factory=list, description="Input parameters")
     outputs: List[IOType] = Field(default_factory=list, description="Return values")
-    modifiers: List[str] = Field(default_factory=list, description="Access modifiers (public, private, static, etc.)")
-    side_effects: List[str] = Field(default_factory=list, description="Side effects (I/O, state changes, etc.)")
+    modifiers: List[str] = Field(default_factory=list, description="Access modifiers")
+    side_effects: List[str] = Field(default_factory=list, description="Side effects")
     decisions: List[DecisionPoint] = Field(default_factory=list, description="Conditional logic")
-    exceptions: List[str] = Field(default_factory=list, description="Exceptions thrown or handled")
-    dependencies: List[str] = Field(default_factory=list, description="External dependencies used")
-    business_logic: Optional[str] = Field(None, description="High-level business logic explanation")
+    exceptions: List[str] = Field(default_factory=list, description="Exceptions")
+    dependencies: List[str] = Field(default_factory=list, description="External dependencies")
+    business_logic: Optional[str] = Field(None, description="Business logic explanation")
 
 
 class ModuleIR(BaseModel):
@@ -37,8 +37,8 @@ class ModuleIR(BaseModel):
     type: Literal["class", "module", "interface", "abstract_class"] = Field(..., description="Type of module")
     description: str = Field(..., description="Purpose of this module")
     imports: List[str] = Field(default_factory=list, description="Import statements")
-    functions: List[FunctionIR] = Field(default_factory=list, description="Methods/functions in this module")
-    attributes: List[IOType] = Field(default_factory=list, description="Class attributes/fields")
+    functions: List[FunctionIR] = Field(default_factory=list, description="Methods/functions")
+    attributes: List[IOType] = Field(default_factory=list, description="Class attributes")
     design_patterns: List[str] = Field(default_factory=list, description="Design patterns used")
 
 
@@ -53,36 +53,10 @@ class TechnicalDebt(BaseModel):
 class ProjectIR(BaseModel):
     """Complete project intermediate representation"""
     language: str = Field(..., description="Programming language")
+    original_filename: str = Field(..., description="Original filename (e.g., Calculator.java)")
+    suggested_filename: str = Field(..., description="Suggested modern filename (e.g., CalculatorService.java)")
     summary: str = Field(..., description="High-level project description")
     modules: List[ModuleIR] = Field(..., description="All classes/modules")
     technical_debt: List[TechnicalDebt] = Field(default_factory=list, description="Issues identified")
-    dependencies: List[str] = Field(default_factory=list, description="External libraries/frameworks")
+    dependencies: List[str] = Field(default_factory=list, description="External libraries")
     modernization_priority: List[str] = Field(default_factory=list, description="What to modernize first")
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "language": "java",
-                "summary": "Legacy calculator application",
-                "modules": [
-                    {
-                        "name": "Calculator",
-                        "type": "class",
-                        "description": "Main calculator class",
-                        "functions": [
-                            {
-                                "name": "add",
-                                "description": "Adds two numbers",
-                                "inputs": [
-                                    {"name": "a", "type": "int", "description": "First number"},
-                                    {"name": "b", "type": "int", "description": "Second number"}
-                                ],
-                                "outputs": [
-                                    {"name": "return", "type": "int", "description": "Sum of a and b"}
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            }
-        }

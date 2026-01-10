@@ -1,6 +1,9 @@
 import os
 import streamlit as st
 from dotenv import load_dotenv
+import zipfile
+from io import BytesIO
+from pathlib import Path
 
 from core.language_detector import detect_language
 from agents.documentation_agent import DocumentationAgent
@@ -18,16 +21,56 @@ st.set_page_config(
 )
 
 # -----------------------------
+# Helper Functions
+# -----------------------------
+def get_file_extension(language: str) -> str:
+    """Get proper file extension for language"""
+    extension_map = {
+        "python": "py",
+        "java": "java",
+        "javascript": "js",
+        "cpp": "cpp",
+        "c": "c",
+        "csharp": "cs",
+        "c#": "cs",
+        "typescript": "ts",
+        "go": "go",
+        "rust": "rs"
+    }
+    return extension_map.get(language.lower(), "txt")
+
+
+def create_download_zip(files_dict: dict) -> bytes:
+    """
+    Create a ZIP file from dictionary of files
+    
+    Args:
+        files_dict: {"folder/filename.ext": "content", ...}
+    
+    Returns:
+        bytes: ZIP file content
+    """
+    zip_buffer = BytesIO()
+    
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for filepath, content in files_dict.items():
+            zip_file.writestr(filepath, content)
+    
+    zip_buffer.seek(0)
+    return zip_buffer.getvalue()
+
+
+# -----------------------------
 # Title
 # -----------------------------
 st.title("🚀 Legacy Code Modernizer")
 st.markdown("""
-### AI-Powered Two-Stage Modernization with Schema Validation
+### AI-Powered Two-Stage Modernization
 
 **Stage 1:** Structured analysis with schema validation  
 **Stage 2:** Modern, production-ready code generation
 
-*Powered by OpenRouter AI*
+*Supports single files and bulk uploads with folder structure preservation*
 """)
 
 # -----------------------------
@@ -35,228 +78,221 @@ st.markdown("""
 # -----------------------------
 st.header("📝 Input Legacy Code")
 
-col1, col2 = st.columns([1, 1])
-
-with col1:
-    uploaded_file = st.file_uploader(
-        "Upload legacy code",
-        type=["py", "java", "js", "cpp", "c", "cs"]
-    )
-
-with col2:
-    manual_language = st.selectbox(
-        "Language (optional)",
-        ["Auto-detect", "Python", "Java", "JavaScript", "C++", "C#"]
-    )
-
-code_input = st.text_area(
-    "Or paste code here",
-    height=300,
-    placeholder="Paste legacy code..."
+upload_mode = st.radio(
+    "Upload Mode",
+    ["Single File", "Multiple Files (Bulk)"],
+    horizontal=True
 )
 
+if upload_mode == "Single File":
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        uploaded_file = st.file_uploader(
+            "Upload legacy code file",
+            type=["py", "java", "js", "cpp", "c", "cs", "ts", "go", "rs"]
+        )
+    
+    with col2:
+        manual_language = st.selectbox(
+            "Language (optional)",
+            ["Auto-detect", "Python", "Java", "JavaScript", "C++", "C#"]
+        )
+    
+    code_input = st.text_area(
+        "Or paste code here",
+        height=300,
+        placeholder="Paste legacy code..."
+    )
+    
+    files_to_process = []
+    
+    if uploaded_file:
+        files_to_process = [(uploaded_file.name, uploaded_file.read().decode("utf-8"), "")]
+    elif code_input.strip():
+        files_to_process = [("pasted_code.txt", code_input, "")]
+
+else:
+    # Bulk upload mode
+    uploaded_files = st.file_uploader(
+        "Upload multiple legacy code files",
+        type=["py", "java", "js", "cpp", "c", "cs", "ts", "go", "rs"],
+        accept_multiple_files=True
+    )
+    
+    files_to_process = []
+    
+    if uploaded_files:
+        st.info(f"📁 {len(uploaded_files)} files uploaded")
+        
+        for uploaded_file in uploaded_files:
+            # Extract folder structure from filename if present
+            file_path = Path(uploaded_file.name)
+            folder = str(file_path.parent) if file_path.parent != Path('.') else ""
+            filename = file_path.name
+            content = uploaded_file.read().decode("utf-8")
+            
+            files_to_process.append((filename, content, folder))
+
 # -----------------------------
-# Process
+# Process Button
 # -----------------------------
-if st.button("🔍 Analyze & Modernize", type="primary", use_container_width=True):
+if st.button("🔍 Analyze & Modernize All", type="primary", use_container_width=True):
     
     # Check API key
     if not os.getenv("OPEN_ROUTER_API_KEY"):
         st.error("❌ OPEN_ROUTER_API_KEY not found in .env file")
         st.stop()
     
-    if not uploaded_file and not code_input.strip():
-        st.warning("⚠️ Please provide code")
+    if not files_to_process:
+        st.warning("⚠️ Please provide code file(s)")
         st.stop()
     
-    # Get code
-    if uploaded_file:
-        source_code = uploaded_file.read().decode("utf-8")
-        filename = uploaded_file.name
-    else:
-        source_code = code_input
-        filename = ""
+    # Storage for results
+    all_results = []
+    modernized_files = {}  # For ZIP: {path: content}
+    documentation_files = {}  # For ZIP: {path: content}
     
-    # Detect language
-    if manual_language != "Auto-detect":
-        language = manual_language.lower()
-    else:
-        language = detect_language(filename, source_code)
+    # Process each file
+    progress_bar = st.progress(0)
+    status_text = st.empty()
     
-    st.info(f"📌 Language: **{language.upper()}**")
-    
-    # -----------------------------
-    # STAGE 1: Structured Analysis
-    # -----------------------------
-    st.header("📚 Stage 1: Structured Analysis")
-    
-    try:
-        with st.spinner("🤖 Analyzing code with schema validation..."):
+    for idx, (filename, source_code, folder) in enumerate(files_to_process):
+        status_text.text(f"Processing {idx + 1}/{len(files_to_process)}: {filename}")
+        
+        # Detect language
+        if upload_mode == "Single File" and manual_language != "Auto-detect":
+            language = manual_language.lower()
+        else:
+            language = detect_language(filename, source_code)
+        
+        try:
+            # -----------------------------
+            # STAGE 1: Analysis
+            # -----------------------------
             doc_agent = DocumentationAgent()
-            project_ir = doc_agent.generate_structured_analysis(source_code, language)
-        
-        st.success("✅ Analysis complete - Schema validated")
-        
-        # Tabs
-        tab1, tab2, tab3, tab4 = st.tabs([
-            "📊 Structured IR",
-            "📋 Code Skeleton",
-            "📖 Documentation",
-            "🔍 Raw JSON"
-        ])
-        
-        with tab1:
-            st.markdown("### Validated Intermediate Representation")
+            project_ir = doc_agent.generate_structured_analysis(source_code, language, filename)
             
-            # Summary
-            st.markdown(f"**Summary:** {project_ir.summary}")
-            st.markdown(f"**Language:** {project_ir.language}")
-            st.markdown(f"**Modules:** {len(project_ir.modules)}")
-            
-            # Module breakdown
-            for module in project_ir.modules:
-                with st.expander(f"📦 {module.name} ({module.type})"):
-                    st.markdown(f"**Description:** {module.description}")
-                    st.markdown(f"**Functions:** {len(module.functions)}")
-                    
-                    if module.design_patterns:
-                        st.markdown(f"**Patterns:** {', '.join(module.design_patterns)}")
-                    
-                    for func in module.functions:
-                        st.markdown(f"##### {func.name}")
-                        st.markdown(f"*{func.description}*")
-                        
-                        if func.inputs:
-                            st.markdown("**Inputs:**")
-                            for inp in func.inputs:
-                                st.markdown(f"- `{inp.type} {inp.name}`: {inp.description or 'N/A'}")
-                        
-                        if func.side_effects:
-                            st.warning(f"Side effects: {', '.join(func.side_effects)}")
-            
-            # Technical debt
-            if project_ir.technical_debt:
-                st.markdown("### ⚠️ Technical Debt")
-                for debt in project_ir.technical_debt:
-                    severity_color = {
-                        "critical": "🔴",
-                        "high": "🟠",
-                        "medium": "🟡",
-                        "low": "🟢"
-                    }
-                    st.markdown(f"{severity_color[debt.severity]} **{debt.category}** ({debt.severity}): {debt.description}")
-                    st.caption(f"💡 {debt.recommendation}")
-        
-        with tab2:
-            st.markdown("### Code Skeleton")
-            skeleton = doc_agent.generate_code_skeleton(project_ir)
-            st.code(skeleton, language=language)
-            
-            st.download_button(
-                "⬇️ Download Skeleton",
-                skeleton,
-                f"skeleton.{language}",
-                use_container_width=True
-            )
-        
-        with tab3:
-            st.markdown("### Comprehensive Documentation")
+            # Generate documentation
             docs = doc_agent.generate_markdown_from_ir(project_ir)
-            st.markdown(docs)
+            skeleton = doc_agent.generate_code_skeleton(project_ir)
             
-            st.download_button(
-                "⬇️ Download Documentation",
-                docs,
-                "documentation.md",
-                use_container_width=True
-            )
-        
-        with tab4:
-            st.markdown("### Raw JSON (Validated)")
-            json_output = project_ir.model_dump_json(indent=2)
-            st.code(json_output, language="json")
-            
-            st.download_button(
-                "⬇️ Download JSON",
-                json_output,
-                "analysis.json",
-                use_container_width=True
-            )
-    
-    except ValueError as e:
-        st.error(f"""
-        ❌ **Schema Validation Failed**
-        
-        The LLM output did not match the required schema.
-        
-        **Error:** {str(e)}
-        
-        **Troubleshooting:**
-        - Try a different model in .env file
-        - Simplify the input code
-        - Check if code is syntactically valid
-        """)
-        st.stop()
-    
-    except Exception as e:
-        st.error(f"""
-        ❌ **Analysis Failed**
-        
-        **Error:** {str(e)}
-        
-        Check your .env configuration.
-        """)
-        st.stop()
-    
-    # -----------------------------
-    # STAGE 2: Modernization
-    # -----------------------------
-    st.header("⚡ Stage 2: Code Modernization")
-    
-    try:
-        with st.spinner("🤖 Generating modern code..."):
+            # -----------------------------
+            # STAGE 2: Modernization
+            # -----------------------------
             mod_agent = ModernizationAgent()
-            modern_code = mod_agent.modernize_code(source_code, language)
+            modernization_result = mod_agent.modernize_code(
+                source_code,
+                language,
+                project_ir.original_filename,
+                project_ir.suggested_filename
+            )
+            
+            # Store results
+            result = {
+                "original_filename": filename,
+                "folder": folder,
+                "language": language,
+                "ir": project_ir,
+                "documentation": docs,
+                "skeleton": skeleton,
+                "modernized_code": modernization_result["modernized_code"],
+                "suggested_filename": modernization_result["filename"],
+                "changes_summary": modernization_result["changes_summary"]
+            }
+            
+            all_results.append(result)
+            
+            # Add to ZIP collections
+            # Preserve folder structure
+            base_path = folder if folder else "output"
+            
+            modernized_files[f"{base_path}/modernized/{result['suggested_filename']}"] = result["modernized_code"]
+            documentation_files[f"{base_path}/docs/{filename}.md"] = result["documentation"]
+            documentation_files[f"{base_path}/skeleton/{filename}"] = result["skeleton"]
         
-        st.success(f"✅ Modern {language.upper()} generated")
+        except Exception as e:
+            st.error(f"❌ Failed to process {filename}: {str(e)}")
+            continue
         
-        st.code(modern_code, language=language)
-        
+        # Update progress
+        progress_bar.progress((idx + 1) / len(files_to_process))
+    
+    status_text.text("✅ All files processed!")
+    progress_bar.empty()
+    
+    # -----------------------------
+    # Display Results
+    # -----------------------------
+    if not all_results:
+        st.error("No files were successfully processed")
+        st.stop()
+    
+    st.success(f"✅ Successfully processed {len(all_results)}/{len(files_to_process)} files")
+    
+    # -----------------------------
+    # Download Options
+    # -----------------------------
+    st.header("📥 Download Results")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        # Download all modernized code as ZIP
+        modernized_zip = create_download_zip(modernized_files)
         st.download_button(
-            "⬇️ Download Modern Code",
-            modern_code,
-            f"modernized.{language}",
+            "⬇️ Download All Modernized Code (ZIP)",
+            modernized_zip,
+            "modernized_code.zip",
+            "application/zip",
             use_container_width=True
         )
-        
-        # Comparison
-        st.markdown("---")
-        st.subheader("🔄 Before & After")
-        
-        col_old, col_new = st.columns(2)
-        
-        with col_old:
-            st.markdown("#### Legacy")
-            st.code(source_code[:1000], language=language)
-        
-        with col_new:
-            st.markdown("#### Modern")
-            st.code(modern_code[:1000], language=language)
     
-    except Exception as e:
-        st.error(f"""
-        ❌ **Modernization Failed**
-        
-        **Error:** {str(e)}
-        
-        Documentation from Stage 1 is still available above.
-        """)
-
-# -----------------------------
-# Footer
-# -----------------------------
-st.markdown("---")
-st.caption("""
-**Architecture:** Legacy Code → Schema-Validated IR → Documentation + Skeleton → Modernized Code  
-**Powered by:** OpenRouter AI
-""")
+    with col2:
+        # Download all documentation as ZIP
+        docs_zip = create_download_zip(documentation_files)
+        st.download_button(
+            "⬇️ Download All Documentation (ZIP)",
+            docs_zip,
+            "documentation.zip",
+            "application/zip",
+            use_container_width=True
+        )
+    
+    with col3:
+        # Download everything combined
+        all_files = {**modernized_files, **documentation_files}
+        all_zip = create_download_zip(all_files)
+        st.download_button(
+            "⬇️ Download Everything (ZIP)",
+            all_zip,
+            "complete_output.zip",
+            "application/zip",
+            use_container_width=True
+        )
+    
+    # -----------------------------
+    # Display Individual Results
+    # -----------------------------
+    st.header("📊 Detailed Results")
+    
+    for result in all_results:
+        with st.expander(f"📄 {result['original_filename']} → {result['suggested_filename']}"):
+            
+            st.markdown(f"**Language:** {result['language'].upper()}")
+            st.markdown(f"**Folder:** `{result['folder'] or 'root'}`")
+            st.markdown(f"**Changes:** {result['changes_summary']}")
+            
+            tab1, tab2, tab3, tab4 = st.tabs(["Modernized Code", "Documentation", "Skeleton", "IR Analysis"])
+            
+            with tab1:
+                st.code(result["modernized_code"], language=result["language"])
+            
+            with tab2:
+                st.markdown(result["documentation"])
+            
+            with tab3:
+                st.code(result["skeleton"], language=result["language"])
+            
+            with tab4:
+                st.json(result["ir"].model_dump())

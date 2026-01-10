@@ -13,9 +13,14 @@ class DocumentationAgent:
     def __init__(self):
         self.llm = LLMClient()
     
-    def generate_structured_analysis(self, code: str, language: str) -> ProjectIR:
+    def generate_structured_analysis(self, code: str, language: str, filename: str = "unknown") -> ProjectIR:
         """
         Generate validated IR from legacy code
+        
+        Args:
+            code: Source code to analyze
+            language: Programming language
+            filename: Original filename
         
         Returns:
             ProjectIR: Validated Pydantic model
@@ -24,7 +29,7 @@ class DocumentationAgent:
             ValueError: If LLM output doesn't match schema
             RuntimeError: If LLM call fails
         """
-        user_prompt = create_documentation_prompt(code, language)
+        user_prompt = create_documentation_prompt(code, language, filename)
         
         # Get LLM response
         raw_response = self.llm.generate(
@@ -68,12 +73,14 @@ class DocumentationAgent:
     
     def generate_markdown_from_ir(self, ir: ProjectIR) -> str:
         """
-        Convert validated IR to human-readable markdown
+        Convert validated IR to human-readable markdown documentation
         """
         sections = []
         
         # Header
         sections.append(f"# {ir.language.upper()} Code Analysis\n")
+        sections.append(f"**Original File:** `{ir.original_filename}`  ")
+        sections.append(f"**Suggested Modern Name:** `{ir.suggested_filename}`\n")
         sections.append(f"## Project Summary\n{ir.summary}\n")
         
         # Modules
@@ -83,7 +90,7 @@ class DocumentationAgent:
             sections.append(f"{module.description}\n")
             
             if module.design_patterns:
-                sections.append(f"**Patterns Used:** {', '.join(module.design_patterns)}\n")
+                sections.append(f"**Design Patterns:** {', '.join(module.design_patterns)}\n")
             
             if module.attributes:
                 sections.append("**Attributes:**\n")
@@ -170,6 +177,8 @@ class DocumentationAgent:
             # Class/Module header
             if ir.language == "java":
                 lines.append(f"// {module.description}")
+                lines.append(f"// Original: {ir.original_filename}")
+                lines.append(f"// Suggested: {ir.suggested_filename}")
                 lines.append(f"public class {module.name} {{")
                 lines.append("")
                 
@@ -204,13 +213,24 @@ class DocumentationAgent:
                 lines.append("}")
             
             elif ir.language == "python":
-                lines.append(f'"""{module.description}"""')
+                lines.append(f'"""')
+                lines.append(f'{module.description}')
+                lines.append(f'Original: {ir.original_filename}')
+                lines.append(f'Suggested: {ir.suggested_filename}')
+                lines.append(f'"""')
                 lines.append("")
                 
                 if module.type == "class":
                     lines.append(f"class {module.name}:")
                     lines.append(f'    """{module.description}"""')
                     lines.append("")
+                    
+                    # Attributes
+                    if module.attributes:
+                        lines.append("    def __init__(self):")
+                        for attr in module.attributes:
+                            lines.append(f"        self.{attr.name}: {attr.type} = None  # {attr.description or ''}")
+                        lines.append("")
                     
                     for func in module.functions:
                         params = ", ".join(["self"] + [inp.name for inp in func.inputs])
@@ -222,6 +242,7 @@ class DocumentationAgent:
                         lines.append("        pass")
                         lines.append("")
                 else:
+                    # Module-level functions
                     for func in module.functions:
                         params = ", ".join([inp.name for inp in func.inputs])
                         lines.append(f"def {func.name}({params}):")
@@ -230,6 +251,37 @@ class DocumentationAgent:
                             lines.append(f"    # Logic: {func.business_logic}")
                         lines.append("    # TODO: Implement")
                         lines.append("    pass")
+                        lines.append("")
+            
+            elif ir.language == "javascript":
+                lines.append(f"// {module.description}")
+                lines.append(f"// Original: {ir.original_filename}")
+                lines.append(f"// Suggested: {ir.suggested_filename}")
+                lines.append("")
+                
+                if module.type == "class":
+                    lines.append(f"class {module.name} {{")
+                    
+                    for func in module.functions:
+                        params = ", ".join([inp.name for inp in func.inputs])
+                        lines.append(f"  // {func.description}")
+                        lines.append(f"  {func.name}({params}) {{")
+                        if func.business_logic:
+                            lines.append(f"    // Logic: {func.business_logic}")
+                        lines.append("    // TODO: Implement")
+                        lines.append("  }")
+                        lines.append("")
+                    
+                    lines.append("}")
+                else:
+                    for func in module.functions:
+                        params = ", ".join([inp.name for inp in func.inputs])
+                        lines.append(f"// {func.description}")
+                        lines.append(f"function {func.name}({params}) {{")
+                        if func.business_logic:
+                            lines.append(f"  // Logic: {func.business_logic}")
+                        lines.append("  // TODO: Implement")
+                        lines.append("}")
                         lines.append("")
         
         return '\n'.join(lines)

@@ -9,40 +9,33 @@ Your task is to analyze legacy code and return a structured JSON response that E
 
 {ProjectIR.model_json_schema()}
 
+**IMPORTANT FILENAME RULES:**
+- `original_filename`: Use the exact filename provided
+- `suggested_filename`: Suggest a modern, descriptive filename based on the code's purpose
+  Examples:
+  - Calculator.java → CalculatorService.java
+  - old_utils.py → string_utilities.py
+  - DataHelper.java → UserDataRepository.java
+
 **CRITICAL RULES:**
-1. Return ONLY valid JSON - no markdown, no explanations, no code fences
+1. Return ONLY valid JSON - no markdown, no explanations
 2. Every field must match the schema exactly
-3. Use null for optional fields if unknown
-4. Be thorough in analysis - include all functions, logic, decisions
-5. Identify technical debt and modernization needs
-6. Explain business logic clearly
-
-**QUALITY CHECKLIST:**
-✓ All functions documented with inputs/outputs
-✓ Side effects identified (I/O, state changes, network calls)
-✓ Decision points extracted (if/else, switch, loops)
-✓ Exceptions documented
-✓ Dependencies listed
-✓ Technical debt categorized by severity
-✓ Modernization priorities ranked
-
-Think step-by-step:
-1. Identify all classes/modules
-2. For each class, identify all methods
-3. For each method, extract signature, logic, dependencies
-4. Identify patterns and anti-patterns
-5. Flag legacy code issues
-6. Recommend modernization priorities
+3. Be thorough in analysis
+4. Identify technical debt
+5. Suggest appropriate modern filename
 
 Return ONLY the JSON object matching the schema."""
 
 
-def create_documentation_prompt(code: str, language: str) -> str:
-    return f"""Analyze this legacy {language.upper()} code and return structured JSON following the exact schema provided.
+def create_documentation_prompt(code: str, language: str, filename: str) -> str:
+    return f"""Analyze this legacy {language.upper()} code and return structured JSON.
+
+**ORIGINAL FILENAME:** {filename}
+**LANGUAGE:** {language}
 
 **CODE TO ANALYZE:**
 ```{language}
 {code}
 ```
 
-Return ONLY valid JSON matching the ProjectIR schema. No markdown fences, no explanations."""
+Return ONLY valid JSON matching the ProjectIR schema. Include original_filename and suggest a modern filename."""

@@ -5,45 +5,72 @@ from prompts.modernization_prompt import (
     MODERNIZATION_SYSTEM_PROMPT,
     create_modernization_prompt
 )
+import json
 
 
 class ModernizationAgent:
     def __init__(self):
         self.llm = LLMClient()
     
-    def modernize_code(self, code: str, language: str) -> str:
+    def modernize_code(self, code: str, language: str, original_filename: str, suggested_filename: str) -> dict:
         """
-        Stage 2: Modernize legacy code
+        Modernize legacy code
+        
+        Args:
+            code: Legacy source code
+            language: Programming language
+            original_filename: Original file name
+            suggested_filename: Suggested modern filename from IR
         
         Returns:
-            str: Modern, production-ready code
+            dict: {
+                "modernized_code": str,
+                "filename": str,
+                "changes_summary": str
+            }
         """
-        user_prompt = create_modernization_prompt(code, language)
+        user_prompt = create_modernization_prompt(code, language, original_filename, suggested_filename)
         
-        # LLM-only, let it fail if it fails
-        modern_code = self.llm.generate(
+        # LLM call
+        raw_response = self.llm.generate(
             system_prompt=MODERNIZATION_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             temperature=0
         )
         
-        # Clean up markdown code fences if present
-        modern_code = self._clean_code_output(modern_code)
-        
-        return modern_code
+        # Parse JSON response
+        result = self._parse_modernization_response(raw_response)
+        return result
     
-    def _clean_code_output(self, code: str) -> str:
-        """
-        Remove markdown code fences if present
-        """
-        lines = code.strip().split('\n')
+    def _parse_modernization_response(self, response: str) -> dict:
+        """Parse and validate modernization response"""
+        response = response.strip()
         
-        # Remove opening fence
-        if lines[0].startswith('```'):
+        # Remove markdown fences
+        if response.startswith('```'):
+            lines = response.split('\n')
             lines = lines[1:]
+            if lines and lines[-1].strip() == '```':
+                lines = lines[:-1]
+            response = '\n'.join(lines)
         
-        # Remove closing fence
-        if lines[-1].startswith('```'):
-            lines = lines[:-1]
+        try:
+            result = json.loads(response)
+            
+            # Validate required fields
+            if "modernized_code" not in result:
+                raise ValueError("Missing 'modernized_code' field")
+            if "filename" not in result:
+                result["filename"] = "modernized_code.txt"
+            if "changes_summary" not in result:
+                result["changes_summary"] = "Code modernized"
+            
+            return result
         
-        return '\n'.join(lines)
+        except json.JSONDecodeError:
+            # Fallback: treat entire response as code
+            return {
+                "modernized_code": response,
+                "filename": "modernized_code.txt",
+                "changes_summary": "Modernization completed (no structured response)"
+            }
