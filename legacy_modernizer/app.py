@@ -35,7 +35,9 @@ def get_file_extension(language: str) -> str:
         "c#": "cs",
         "typescript": "ts",
         "go": "go",
-        "rust": "rs"
+        "rust": "rs",
+        "kotlin": "kt",
+        "swift": "swift"
     }
     return extension_map.get(language.lower(), "txt")
 
@@ -65,16 +67,17 @@ def create_download_zip(files_dict: dict) -> bytes:
 # -----------------------------
 st.title("🚀 Legacy Code Modernizer")
 st.markdown("""
-### AI-Powered Two-Stage Modernization
+### AI-Powered Two-Stage Modernization with Comprehensive Documentation
 
 **Stage 1:** Structured analysis with schema validation  
-**Stage 2:** Modern, production-ready code generation
+**Stage 2:** Modern, production-ready code generation  
+**Documentation:** Master document + modular focused docs
 
 *Supports single files and bulk uploads with folder structure preservation*
 """)
 
 # -----------------------------
-# Input
+# Input Section
 # -----------------------------
 st.header("📝 Input Legacy Code")
 
@@ -90,13 +93,13 @@ if upload_mode == "Single File":
     with col1:
         uploaded_file = st.file_uploader(
             "Upload legacy code file",
-            type=["py", "java", "js", "cpp", "c", "cs", "ts", "go", "rs"]
+            type=["py", "java", "js", "cpp", "c", "cs", "ts", "go", "rs", "kt", "swift"]
         )
     
     with col2:
         manual_language = st.selectbox(
             "Language (optional)",
-            ["Auto-detect", "Python", "Java", "JavaScript", "C++", "C#"]
+            ["Auto-detect", "Python", "Java", "JavaScript", "C++", "C#", "TypeScript"]
         )
     
     code_input = st.text_area(
@@ -116,7 +119,7 @@ else:
     # Bulk upload mode
     uploaded_files = st.file_uploader(
         "Upload multiple legacy code files",
-        type=["py", "java", "js", "cpp", "c", "cs", "ts", "go", "rs"],
+        type=["py", "java", "js", "cpp", "c", "cs", "ts", "go", "rs", "kt", "swift"],
         accept_multiple_files=True
     )
     
@@ -170,23 +173,35 @@ if st.button("🔍 Analyze & Modernize All", type="primary", use_container_width
             # -----------------------------
             # STAGE 1: Analysis
             # -----------------------------
-            doc_agent = DocumentationAgent()
-            project_ir = doc_agent.generate_structured_analysis(source_code, language, filename)
+            with st.spinner(f"🤖 Analyzing {filename}..."):
+                doc_agent = DocumentationAgent()
+                project_ir = doc_agent.generate_structured_analysis(source_code, language, filename)
             
-            # Generate documentation
-            docs = doc_agent.generate_markdown_from_ir(project_ir)
+            # Generate skeleton
             skeleton = doc_agent.generate_code_skeleton(project_ir)
             
             # -----------------------------
             # STAGE 2: Modernization
             # -----------------------------
-            mod_agent = ModernizationAgent()
-            modernization_result = mod_agent.modernize_code(
-                source_code,
-                language,
-                project_ir.original_filename,
-                project_ir.suggested_filename
-            )
+            with st.spinner(f"⚡ Modernizing {filename}..."):
+                mod_agent = ModernizationAgent()
+                modernization_result = mod_agent.modernize_code(
+                    source_code,
+                    language,
+                    project_ir.original_filename,
+                    project_ir.suggested_filename
+                )
+            
+            # -----------------------------
+            # STAGE 3: Comprehensive Documentation
+            # -----------------------------
+            with st.spinner(f"📝 Generating documentation for {filename}..."):
+                comprehensive_docs = doc_agent.generate_comprehensive_documentation(
+                    project_ir,
+                    source_code,
+                    modernization_result["modernized_code"],
+                    modernization_result["changes_summary"]
+                )
             
             # Store results
             result = {
@@ -194,7 +209,8 @@ if st.button("🔍 Analyze & Modernize All", type="primary", use_container_width
                 "folder": folder,
                 "language": language,
                 "ir": project_ir,
-                "documentation": docs,
+                "master_documentation": comprehensive_docs["master_doc"],
+                "modular_documentation": comprehensive_docs["modular_docs"],
                 "skeleton": skeleton,
                 "modernized_code": modernization_result["modernized_code"],
                 "suggested_filename": modernization_result["filename"],
@@ -207,10 +223,22 @@ if st.button("🔍 Analyze & Modernize All", type="primary", use_container_width
             # Preserve folder structure
             base_path = folder if folder else "output"
             
+            # Modernized code
             modernized_files[f"{base_path}/modernized/{result['suggested_filename']}"] = result["modernized_code"]
-            documentation_files[f"{base_path}/docs/{filename}.md"] = result["documentation"]
+            
+            # Master documentation
+            documentation_files[f"{base_path}/docs/MASTER_DOCUMENTATION.md"] = result["master_documentation"]
+            
+            # Modular documentation
+            for doc_name, doc_content in result["modular_documentation"].items():
+                documentation_files[f"{base_path}/docs/{doc_name}"] = doc_content
+            
+            # Skeleton
             documentation_files[f"{base_path}/skeleton/{filename}"] = result["skeleton"]
         
+        except ValueError as e:
+            st.error(f"❌ Schema validation failed for {filename}: {str(e)}")
+            continue
         except Exception as e:
             st.error(f"❌ Failed to process {filename}: {str(e)}")
             continue
@@ -222,7 +250,7 @@ if st.button("🔍 Analyze & Modernize All", type="primary", use_container_width
     progress_bar.empty()
     
     # -----------------------------
-    # Display Results
+    # Display Results Summary
     # -----------------------------
     if not all_results:
         st.error("No files were successfully processed")
@@ -241,7 +269,7 @@ if st.button("🔍 Analyze & Modernize All", type="primary", use_container_width
         # Download all modernized code as ZIP
         modernized_zip = create_download_zip(modernized_files)
         st.download_button(
-            "⬇️ Download All Modernized Code (ZIP)",
+            "⬇️ Download Modernized Code (ZIP)",
             modernized_zip,
             "modernized_code.zip",
             "application/zip",
@@ -252,7 +280,7 @@ if st.button("🔍 Analyze & Modernize All", type="primary", use_container_width
         # Download all documentation as ZIP
         docs_zip = create_download_zip(documentation_files)
         st.download_button(
-            "⬇️ Download All Documentation (ZIP)",
+            "⬇️ Download Documentation (ZIP)",
             docs_zip,
             "documentation.zip",
             "application/zip",
@@ -277,22 +305,121 @@ if st.button("🔍 Analyze & Modernize All", type="primary", use_container_width
     st.header("📊 Detailed Results")
     
     for result in all_results:
-        with st.expander(f"📄 {result['original_filename']} → {result['suggested_filename']}"):
+        with st.expander(f"📄 {result['original_filename']} → {result['suggested_filename']}", expanded=False):
             
             st.markdown(f"**Language:** {result['language'].upper()}")
             st.markdown(f"**Folder:** `{result['folder'] or 'root'}`")
-            st.markdown(f"**Changes:** {result['changes_summary']}")
+            st.markdown(f"**Summary:** {result['changes_summary']}")
             
-            tab1, tab2, tab3, tab4 = st.tabs(["Modernized Code", "Documentation", "Skeleton", "IR Analysis"])
+            st.markdown("---")
+            
+            # Tabs for different views
+            tab1, tab2, tab3, tab4, tab5 = st.tabs([
+                "📖 Master Documentation",
+                "📚 Modular Docs",
+                "⚡ Modernized Code",
+                "📋 Skeleton",
+                "🔍 IR Analysis"
+            ])
             
             with tab1:
-                st.code(result["modernized_code"], language=result["language"])
+                st.markdown("### Complete Migration Documentation")
+                st.markdown(result["master_documentation"])
+                
+                st.download_button(
+                    "⬇️ Download Master Doc",
+                    result["master_documentation"],
+                    f"{result['original_filename']}_MASTER_DOC.md",
+                    mime="text/markdown",
+                    key=f"master_doc_{result['original_filename']}"
+                )
             
             with tab2:
-                st.markdown(result["documentation"])
+                st.markdown("### Modular Documentation Files")
+                
+                for doc_name, doc_content in result["modular_documentation"].items():
+                    with st.expander(f"📄 {doc_name}"):
+                        st.markdown(doc_content)
+                        
+                        st.download_button(
+                            f"⬇️ Download {doc_name}",
+                            doc_content,
+                            doc_name,
+                            mime="text/markdown",
+                            key=f"{doc_name}_{result['original_filename']}"
+                        )
             
             with tab3:
-                st.code(result["skeleton"], language=result["language"])
+                st.markdown("### Modernized Code")
+                st.code(result["modernized_code"], language=result["language"])
+                
+                st.download_button(
+                    "⬇️ Download Modern Code",
+                    result["modernized_code"],
+                    result["suggested_filename"],
+                    mime="text/plain",
+                    key=f"modern_{result['original_filename']}"
+                )
+                
+                # Side-by-side comparison
+                st.markdown("---")
+                st.markdown("### 🔄 Before & After Comparison")
+                
+                col_old, col_new = st.columns(2)
+                
+                with col_old:
+                    st.markdown("#### Legacy Code")
+                    st.code(files_to_process[all_results.index(result)][1][:1500], language=result["language"])
+                
+                with col_new:
+                    st.markdown("#### Modern Code")
+                    st.code(result["modernized_code"][:1500], language=result["language"])
             
             with tab4:
+                st.markdown("### Code Skeleton")
+                st.code(result["skeleton"], language=result["language"])
+                
+                st.download_button(
+                    "⬇️ Download Skeleton",
+                    result["skeleton"],
+                    f"skeleton_{result['original_filename']}",
+                    mime="text/plain",
+                    key=f"skeleton_{result['original_filename']}"
+                )
+            
+            with tab5:
+                st.markdown("### Intermediate Representation (IR)")
+                
                 st.json(result["ir"].model_dump())
+                
+                # Key metrics
+                col_m1, col_m2, col_m3 = st.columns(3)
+                
+                with col_m1:
+                    st.metric("Modules", len(result["ir"].modules))
+                
+                with col_m2:
+                    total_functions = sum(len(m.functions) for m in result["ir"].modules)
+                    st.metric("Functions", total_functions)
+                
+                with col_m3:
+                    st.metric("Technical Debt", len(result["ir"].technical_debt))
+                
+                # Technical debt breakdown
+                if result["ir"].technical_debt:
+                    st.markdown("#### Technical Debt by Severity")
+                    
+                    severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+                    for debt in result["ir"].technical_debt:
+                        severity_counts[debt.severity] += 1
+                    
+                    col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+                    
+                    with col_s1:
+                        st.metric("🔴 Critical", severity_counts["critical"])
+                    with col_s2:
+                        st.metric("🟠 High", severity_counts["high"])
+                    with col_s3:
+                        st.metric("🟡 Medium", severity_counts["medium"])
+                    with col_s4:
+                        st.metric("🟢 Low", severity_counts["low"])

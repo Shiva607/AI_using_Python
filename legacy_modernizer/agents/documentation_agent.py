@@ -285,3 +285,20 @@ class DocumentationAgent:
                         lines.append("")
         
         return '\n'.join(lines)
+    
+    def generate_comprehensive_documentation(
+        self,
+        ir: ProjectIR,
+        original_code: str,
+        modernized_code: str,
+        changes_summary: str
+    ) -> dict:
+        """
+        Generate both master and modular documentation
+        """
+        from agents.advanced_documentation_agent import AdvancedDocumentationGenerator
+        
+        generator = AdvancedDocumentationGenerator()
+        return generator.generate_master_documentation(
+            ir, original_code, modernized_code, changes_summary
+        )
