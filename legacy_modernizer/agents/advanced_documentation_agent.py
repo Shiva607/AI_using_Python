@@ -55,18 +55,20 @@ class AdvancedDocumentationGenerator:
         sections.append("---\n")
         
         # 1. Metadata & Environment
-        sections.append("## 1. Metadata & Environment\n")
-        sections.append(f"### Source")
-        sections.append(f"- **Language:** {ir.language.upper()}")
+        sections.append("## 1. 📋 Metadata & Environment\n")
+        sections.append("### 📦 Source\n")
+        sections.append(f"- **Language:** `{ir.language.upper()}`")
         sections.append(f"- **Original File:** `{ir.original_filename}`")
-        sections.append(f"- **Legacy Patterns:** {', '.join([d.category for d in ir.technical_debt[:3]])}\n")
-        
-        sections.append(f"### Target")
+
+        legacy_patterns = ', '.join([d.category for d in ir.technical_debt[:3]]) if ir.technical_debt else 'None detected'
+        sections.append(f"- **Legacy Patterns:** {legacy_patterns}\n")
+
+        sections.append("### 🎯 Target\n")
         sections.append(f"- **Modern File:** `{ir.suggested_filename}`")
         sections.append(f"- **Target Version:** {self._get_modern_version(ir.language)}")
         sections.append(f"- **Modernization Focus:** {changes_summary}\n")
-        
-        sections.append(f"### Paradigm Shift")
+
+        sections.append("### 🔄 Paradigm Shift\n")
         sections.append(self._describe_paradigm_shift(ir))
         sections.append("\n---\n")
         
@@ -295,16 +297,17 @@ class AdvancedDocumentationGenerator:
         """Generate legacy vs modern comparison table"""
         
         lines = []
-        lines.append("| Aspect | Legacy Pattern | Modern Pattern | Why? |")
-        lines.append("|--------|---------------|----------------|------|")
+        lines.append("### 📊 Pattern Comparison\n")
+        lines.append("| Category | Legacy Pattern | Modern Pattern | Benefits |")
+        lines.append("|:---------|:---------------|:---------------|:---------|")
         
         # Analyze technical debt for comparisons
         for debt in ir.technical_debt[:5]:
-            legacy_pattern = debt.description
-            modern_pattern = debt.recommendation
+            legacy = debt.description[:60] + "..." if len(debt.description) > 60 else debt.description
+            modern = debt.recommendation[:60] + "..." if len(debt.recommendation) > 60 else debt.recommendation
             benefit = self._categorize_benefit(debt.category)
             
-            lines.append(f"| {debt.category.title()} | {legacy_pattern[:50]} | {modern_pattern[:50]} | {benefit} |")
+            lines.append(f"| **{debt.category.title()}** | {legacy} | {modern} | {benefit} |")
         
         # Add language-specific patterns
         if ir.language == "python":
