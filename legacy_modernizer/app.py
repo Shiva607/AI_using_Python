@@ -755,13 +755,3 @@ See [INDEX.md](INDEX.md) for complete project structure and file navigation.
                 # Separator between files
                 st.markdown("---")
                 st.markdown("")
-
-# -----------------------------
-# Footer
-# -----------------------------
-st.markdown("---")
-st.caption("""
-**Architecture:** Multi-file processing with folder structure preservation  
-**Documentation:** Interlinked index + comprehensive docs per file  
-**Powered by:** OpenRouter AI with Schema Validation
-""")
